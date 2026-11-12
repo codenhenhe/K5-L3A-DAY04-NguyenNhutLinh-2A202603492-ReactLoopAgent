@@ -237,3 +237,47 @@ Dán đoạn trace chứng minh lỗi và nêu nguyên nhân có thể xảy ra.
 - **Snapshot dữ liệu:** Kết quả chỉ phản ánh snapshot tại `2026-11-09T03:50:47Z` từ các status page. Tool chỉ tìm kiếm trong phạm vi 50 incident gần nhất, vì vậy không thể xem đây là dữ liệu lịch sử đầy đủ hoặc trạng thái hiện tại ở thời điểm khác.
 - **Số lần chạy:** Mỗi phiên bản chỉ được chạy một lần. Kết quả có thể thay đổi do tính không ổn định của LLM, nên mức tăng điểm chưa đủ để chứng minh thay đổi là nguyên nhân trực tiếp.
 - **Giới hạn Evidence Gate:** Cơ chế kiểm tra URL chỉ xác nhận URL đã quan sát xuất hiện trong câu trả lời, không xác minh mọi nhận định trong câu trả lời đều được bằng chứng hỗ trợ. Trường hợp H8 cho thấy vẫn cần kiểm tra tính chính xác giữa từng incident và dữ liệu tool trả về.
+
+## Thử thách bonus
+
+### 1. Nội dung triển khai
+
+Triển khai chức năng Bonus trong `agent.py`, đồng thời giữ nguyên giao diện hàm `run_agent()` và luồng xử lý của bài chính.
+
+Các chức năng đã thực hiện:
+
+- Hỗ trợ kiểm tra trạng thái của 5 nhà cung cấp: **GitHub, Cloudflare, Vercel, npm và DigitalOcean**.
+- Sử dụng `tools.schemas` và `tools.system_prompt` khi được cung cấp bởi Bonus Tools.
+- Xử lý lỗi có thể thử lại như HTTP 429 (Rate Limit), lỗi tham số không hợp lệ và timeout.
+- Giới hạn số lần thử lại, hỗ trợ đọc giá trị `Retry-After` khi gặp HTTP 429.
+- Lọc dữ liệu không liên quan trong kết quả từ tools nhằm giảm nhiễu ngữ cảnh.
+- Hỗ trợ đọc timeline sự cố theo từng trang thông qua `offset`, `limit` và `next_offset`.
+- Dẫn nguồn từ kết quả tools, phân biệt trạng thái snapshot hiện tại với sự cố trong lịch sử.
+- Không suy diễn nguyên nhân khi chưa có đủ bằng chứng và không xem nội dung trả về từ tools là chỉ dẫn hệ thống.
+
+### 2. Cách chạy đánh giá
+
+Sử dụng lệnh:
+
+```bash
+python3 evals/run_evals.py --bonus --output eval_bonus.json
+```
+
+Cấu hình đánh giá:
+- Provider: `openrouter`
+- Model: `z-ai/glm-5.3-flash`
+- Số bước tối đa: `16`
+- Bộ kiểm thử: 10 trường hợp (B1–B10)
+
+### 3. Kết quả đánh giá
+
+| Tiêu chí | Kết quả |
+|---|---:|
+| Tổng số trường hợp kiểm thử | 10 |
+| Số trường hợp được chấm điểm | 10 |
+| Số trường hợp không được chấm | 0 |
+| Điểm đánh giá | **98.9/100** |
+| Điểm Bonus đạt được | **14.84/15** |
+| Vi phạm cơ học | **0** |
+
+Kết quả chi tiết được lưu trong file `eval_bonus.json`.
